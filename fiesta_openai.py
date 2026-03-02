@@ -1,6 +1,7 @@
 import asyncio
 from datetime import datetime, timezone
 from typing import AsyncGenerator, Dict, Iterable, List, Optional, Any, Union
+import os
 
 from openai_schema import ChatCompletionRequest, Message
 from providers.fiesta_provider import FiestaProvider
@@ -32,23 +33,52 @@ def _coerce_content_to_text(content: Union[str, List[Any], None]) -> str:
     return "".join(parts)
 
 
-def _messages_to_prompt(messages: Iterable[Message]) -> str:
+def _format_message(role: str, content: str) -> str:
+    if role == "system":
+        return f"System: {content}"
+    if role == "user":
+        return f"User: {content}"
+    if role == "assistant":
+        return f"Assistant: {content}"
+    return f"{role}: {content}"
+
+
+def _messages_to_prompt(messages: Iterable[Message], max_chars: int = 20000) -> str:
     """
     Convert OpenAI-style messages into a single text prompt suitable for Fiesta.
     """
-    lines: List[str] = []
-    for msg in messages:
-        role = msg.role
-        content = _coerce_content_to_text(msg.content)
-        if role == "system":
-            lines.append(f"System: {content}")
-        elif role == "user":
-            lines.append(f"User: {content}")
-        elif role == "assistant":
-            lines.append(f"Assistant: {content}")
-        else:
-            lines.append(f"{role}: {content}")
-    return "\n\n".join(lines)
+    # Build the full prompt first (useful for short conversations).
+    formatted: List[str] = []
+    msgs = list(messages)
+    for msg in msgs:
+        formatted.append(_format_message(msg.role, _coerce_content_to_text(msg.content)))
+
+    prompt = "\n\n".join(formatted)
+    if len(prompt) <= max_chars:
+        return prompt
+
+    # Fiesta enforces a hard prompt length limit (20k chars). When the conversation
+    # grows too large (e.g. long tool/system messages), keep the most recent
+    # messages and drop older ones until we fit.
+    kept: List[str] = []
+    total = 0
+
+    # Always prefer keeping the latest messages (iterate backwards).
+    for msg in reversed(msgs):
+        line = _format_message(msg.role, _coerce_content_to_text(msg.content))
+        extra = len(line) + (2 if kept else 0)  # account for "\n\n"
+        if total + extra > max_chars:
+            continue
+        kept.append(line)
+        total += extra
+
+    if not kept:
+        # Extreme edge case: a single message exceeds the limit.
+        # Keep the tail end so the user’s most recent instruction is preserved.
+        return prompt[-max_chars:]
+
+    kept.reverse()
+    return "\n\n".join(kept)
 
 
 class FiestaOpenAIClient:
@@ -97,7 +127,8 @@ class FiestaOpenAIClient:
         If stream=True, this returns the same dict but the provider itself
         will already have streamed tokens to stdout.
         """
-        prompt = _messages_to_prompt(request.messages)
+        max_prompt_chars = int(os.environ.get("FIESTA_MAX_PROMPT_CHARS", "20000"))
+        prompt = _messages_to_prompt(request.messages, max_chars=max_prompt_chars)
         content = await self._provider.generate(prompt, stream=stream)
 
         # Build a minimal OpenAI-compatible response object.

@@ -15,7 +15,6 @@ async def chat_completions(request: Request):
     see precise validation errors instead of FastAPI's generic 422.
     """
     body = await request.json()
-    print("Incoming /v1/chat/completions body:", body)
 
     try:
         req = ChatCompletionRequest(**body)

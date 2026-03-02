@@ -1,9 +1,33 @@
 import asyncio
 from datetime import datetime, timezone
-from typing import AsyncGenerator, Dict, Iterable, List, Optional
+from typing import AsyncGenerator, Dict, Iterable, List, Optional, Any, Union
 
 from openai_schema import ChatCompletionRequest, Message
 from providers.fiesta_provider import FiestaProvider
+
+
+def _coerce_content_to_text(content: Union[str, List[Any]]) -> str:
+    """
+    Normalize OpenAI-style message content to a plain string.
+
+    Supports:
+      - plain string content
+      - list of content parts like [{"type": "text", "text": "..."}]
+    """
+    if isinstance(content, str):
+        return content
+
+    parts: List[str] = []
+    for part in content:
+        # Common OpenAI-style shape: {"type": "text", "text": "..."}
+        if isinstance(part, dict):
+            text = part.get("text")
+            if isinstance(text, str):
+                parts.append(text)
+                continue
+        # Fallback: just coerce to string
+        parts.append(str(part))
+    return "".join(parts)
 
 
 def _messages_to_prompt(messages: Iterable[Message]) -> str:
@@ -13,7 +37,7 @@ def _messages_to_prompt(messages: Iterable[Message]) -> str:
     lines: List[str] = []
     for msg in messages:
         role = msg.role
-        content = msg.content
+        content = _coerce_content_to_text(msg.content)
         if role == "system":
             lines.append(f"System: {content}")
         elif role == "user":

@@ -1,12 +1,14 @@
 from pydantic import BaseModel, ConfigDict
-from typing import List, Optional
+from typing import List, Optional, Union, Any
 
 
 class Message(BaseModel):
     model_config = ConfigDict(extra="ignore")  # 👈
 
     role: str
-    content: str
+    # OpenAI-style content can be either a plain string or
+    # a list of content parts (e.g. [{"type": "text", "text": "..."}]).
+    content: Union[str, List[Any]]
 
 
 class ChatCompletionRequest(BaseModel):

@@ -6,7 +6,7 @@ from openai_schema import ChatCompletionRequest, Message
 from providers.fiesta_provider import FiestaProvider
 
 
-def _coerce_content_to_text(content: Union[str, List[Any]]) -> str:
+def _coerce_content_to_text(content: Union[str, List[Any], None]) -> str:
     """
     Normalize OpenAI-style message content to a plain string.
 
@@ -14,6 +14,8 @@ def _coerce_content_to_text(content: Union[str, List[Any]]) -> str:
       - plain string content
       - list of content parts like [{"type": "text", "text": "..."}]
     """
+    if content is None:
+        return ""
     if isinstance(content, str):
         return content
 

@@ -8,7 +8,8 @@ class Message(BaseModel):
     role: str
     # OpenAI-style content can be either a plain string or
     # a list of content parts (e.g. [{"type": "text", "text": "..."}]).
-    content: Union[str, List[Any]]
+    # Some clients also send null content (e.g. tool/function-call messages).
+    content: Optional[Union[str, List[Any]]] = None
 
 
 class ChatCompletionRequest(BaseModel):

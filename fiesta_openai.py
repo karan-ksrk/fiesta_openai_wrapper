@@ -130,12 +130,12 @@ class FiestaOpenAIClient:
         max_prompt_chars = int(os.environ.get("FIESTA_MAX_PROMPT_CHARS", "20000"))
         prompt = _messages_to_prompt(request.messages, max_chars=max_prompt_chars)
 
-        print(f"[DEBUG] Prompt length: {len(prompt)}")
-        print(f"[DEBUG] Prompt preview: {prompt[:200]}")
+        # print(f"[DEBUG] Prompt length: {len(prompt)}")
+        # print(f"[DEBUG] Prompt preview: {prompt[:200]}")
 
         content = await self._provider.generate(prompt, stream=stream)
 
-        print(f"[DEBUG] Raw content returned: {repr(content)}")  # ← key line
+        # print(f"[DEBUG] Raw content returned: {repr(content)}")  # ← key line
 
         # Build a minimal OpenAI-compatible response object.
         now = datetime.now(timezone.utc)

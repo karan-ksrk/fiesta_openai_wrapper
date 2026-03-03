@@ -133,7 +133,7 @@ class FiestaProvider(BaseProvider):
 
         return "".join(full_text)
 
-    async def _generate_full(self, headers: dict, payload: dict):
+    async def _generate_full(self, headers: dict, payload: dict) -> str:
         async with httpx.AsyncClient(timeout=60) as client:
             response = await client.post(
                 FIESTA_URL, json=payload, headers=headers, timeout=60
@@ -149,11 +149,30 @@ class FiestaProvider(BaseProvider):
             )
 
         content_type = response.headers.get("content-type", "")
+
+        # Fiesta almost always returns event-stream format — check this first
         if "text/event-stream" in content_type or "-E" in response.text:
             return _extract_stream_text(response.text)
 
+        # Plain JSON fallback — extract text from known response shapes
         try:
-            return response.json()
+            data = response.json()
+            # Try common Fiesta/OpenAI-style response paths
+            if isinstance(data, dict):
+                # OpenAI-style
+                if "choices" in data:
+                    return data["choices"][0]["message"]["content"]
+                # Fiesta-style flat response
+                if "content" in data:
+                    return data["content"]
+                if "text" in data:
+                    return data["text"]
+                if "response" in data:
+                    return data["response"]
+                # Last resort: dump it so you can see the shape
+                print(f"[DEBUG] Unknown JSON response shape: {data}")
+                return str(data)
+            return str(data)
         except ValueError:
             return _extract_stream_text(response.text)
 

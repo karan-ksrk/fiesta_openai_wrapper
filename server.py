@@ -24,4 +24,5 @@ async def chat_completions(request: Request):
         raise HTTPException(status_code=422, detail=e.errors())
 
     resp = await client.acreate(req, stream=False)
+    print(resp)
     return resp
